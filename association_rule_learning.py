@@ -15,20 +15,20 @@ df = retail_data_prep(df)
 df.head() # take a look
     
 ############################################
-# ARL Veri Yapısını Hazırlama (Invoice-Product Matrix)
+# Preparing ARL Data Structure (Invoice-Product Matrix)
 ############################################
 
 # we are going to choose germany in this case.
 df_gr = df[df['Country'] == "Germany"]
 
 
-df_gr.groupby(['Invoice', 'Description']).agg({"Quantity": "sum"}).head(20) # her bir faturada olan ürünler ve ürünlerin adedi
+df_gr.groupby(['Invoice', 'Description']).agg({"Quantity": "sum"}).head(20) # products and the number of products on each invoice
 
-df_gr.groupby(['Invoice', 'Description']).agg({"Quantity": "sum"}).unstack().iloc[0:5, 0:5] #unstack ile pivot şekline getiriyoruz. Ürün adları sütunlara fatura noları satırlara
+df_gr.groupby(['Invoice', 'Description']).agg({"Quantity": "sum"}).unstack().iloc[0:5, 0:5] #We turn it into a pivot shape with unstack. Product names in columns, invoice numbers in rows
 
-df_gr.groupby(['Invoice', 'Description']).agg({"Quantity": "sum"}).unstack().fillna(0).iloc[0:5, 0:5] #boş değerleri 0 ile dolduruyoruz.
+df_gr.groupby(['Invoice', 'Description']).agg({"Quantity": "sum"}).unstack().fillna(0).iloc[0:5, 0:5] #We fill in blanks with 0.
 
-##apply komutu satır yada sutunu dolaşıyor. Applymap tüm hücreleri. Bize ürün frekansı değil var mı yok mu bilgisi lazım o yuzden yoksa 0 varsa 1 yazdırcaz.
+##The apply command is looping through the row or column. Applymap all cells. We don't need the product frequency or not, so we will print 1 if there is 0.
 df_gr.groupby(['Invoice', 'Description']).agg({"Quantity": "sum"}).unstack().fillna(0).applymap(
     lambda x: 1 if x > 0 else 0).iloc[0:5, 0:5]
 
@@ -36,16 +36,7 @@ df_gr.groupby(['Invoice', 'Description']). \
     agg({"Quantity": "sum"}). \
     unstack(). \
     fillna(0). \
-    applymap(lambda x: 1 if x > 0 else 0).iloc[0:5, 0:5] #hepsinin toplanmış hali
-
-#### fatura ürün bilgisinin oluşturulması stock kodu da eklendi yukarıdakinin fonksiyon hali .. 1  0 şeklinde#####
-def create_invoice_product_df(dataframe, id=False):
-    if id:
-        return dataframe.groupby(['Invoice', "StockCode"])['Quantity'].sum().unstack().fillna(0). \
-            applymap(lambda x: 1 if x > 0 else 0)
-    else:
-        return dataframe.groupby(['Invoice', 'Description'])['Quantity'].sum().unstack().fillna(0). \
-            applymap(lambda x: 1 if x > 0 else 0)
+    applymap(lambda x: 1 if x > 0 else 0).iloc[0:5, 0:5]
 
 
 gr_inv_pro_df = create_invoice_product_df(df_gr)
@@ -53,28 +44,26 @@ gr_inv_pro_df.head()
 
 gr_inv_pro_df = create_invoice_product_df(df_gr, id=True)
 
-### birlikteliklerin olasılıkları ##
+### probabilities of associations ##
 
-#X ve Y birlikte görülme olasılığı ekmek süt
+#X and Y probability of coexistence bread milk
 #Support(X,Y) = Freq(X,Y)/N
-#Confidence(X,Y) = Freq(X,Y) /Freq(X) ekmek satın alındığında sütün alınması olasılığı
-#Lift= Support (X,y)/(Support(X) * Support(Y) X satın alındığında Ynin satın alınma olasılığı lift kat kadar artar.
-#Sepet tanımı önemlidir.
-#Veri içerisindeki örüntüleri bulmak için kullanılan kural tabanlı bir makine öğrenmesi tekniğidir.. Apriori algoritması
+#Confidence(X,Y) = probability of purchasing milk when Freq(X,Y) /Freq(X) bread is purchased
+#Lift= Support (X,y)/(Support(X) * Support(Y) When X is purchased, the probability of Y being purchased increases by a factor of lift.
+# Basket definition is important.
+#It is a rule-based machine learning technique used to find patterns in data. Apriori algorithm
 
 def check_id(dataframe, stock_code):
     product_name = dataframe[dataframe["StockCode"] == stock_code][["Description"]].values.tolist()
     print(product_name)
 
-# TASK 3-ID'leri verilen ürünlerin isimleri?
-#Kullanıcı 1 ürün id'si: 21987 Kullanıcı 2 ürün id'si: 23235 Kullanıcı 3 ürün id'si: 22747
+# The names of the products whose IDs are given?
+
 check_id(df_gr, 21987)
 check_id(df_gr, 23235)
 check_id(df_gr, 22747)
 
-#TASK 4- Sepetteki kullanıcılar için ürün önerisi, yalnız şöyle bir ince çizgi var.
-# Müşteri bu önerilen ürünü satın almış olabilir olmayadabilir.
-# Şuan çok önemli değil ama real casede önemli olabilir..
+#Product recommendation for users in the cart, but there is a fine line. The customer may or may not have purchased this recommended product.
 frequent_itemsets = apriori(gr_inv_pro_df, min_support=0.01, use_colnames=True)
 frequent_itemsets.sort_values("support", ascending=False).head(50)
 
@@ -83,7 +72,7 @@ rules.sort_values("support", ascending=False).head()
 
 rules.sort_values("lift", ascending=False).head(500)
 
-# ürün önerileri #
+# product recommendations #
 def arl_recommender(rules_df, product_id, rec_count=1):
     sorted_rules = rules_df.sort_values("lift", ascending=False)
     recommendation_list = []
@@ -94,17 +83,17 @@ def arl_recommender(rules_df, product_id, rec_count=1):
 
     return recommendation_list[0:rec_count]
 
-#kullanıcı 1#
-arl_recommender(rules, 21987,2) # sonuç : [21989, 21086]
+#Users 1#
+arl_recommender(rules, 21987,2) # result : [21989, 21086]
 check_id(df_gr, 21989) #['PACK OF 20 SKULL PAPER NAPKINS']
 check_id(df_gr, 21086) #['SET/6 RED SPOTTY PAPER CUPS']
 
-#kullanıcı 2#
+#User 2#
 arl_recommender(rules, 23235,3) #[23243, 23244, 23240]
 check_id(df_gr, 23243) #['SET OF TEA COFFEE SUGAR TINS PANTRY']
 check_id(df_gr, 23244) #['ROUND STORAGE TIN VINTAGE LEAF']
 check_id(df_gr, 23240) #['SET OF 4 KNICK KNACK TINS DOILEY ']
 
-#kullanıcı 3#
+#User 3#
 arl_recommender(rules, 22747,1) #[22746]
 check_id(df_gr, 22746)  #["POPPY'S PLAYHOUSE LIVINGROOM "]
